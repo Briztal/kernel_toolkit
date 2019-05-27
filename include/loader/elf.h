@@ -101,10 +101,10 @@ struct elf_identifier {
 
 
 /*
- * rmld init status;
+ * loading_env init status;
  */
 
-/*The type returned when a rmld struct is initialsed;*/
+/*The type returned when a loading_env struct is initialsed;*/
 #define rel_error_t u8
 
 /*If set, elf magic numbers are incorrect;*/

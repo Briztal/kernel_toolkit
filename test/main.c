@@ -6,7 +6,7 @@
 
 #include <unistd.h>
 #include <elf.h>
-#include <rmld.h>
+#include <loader/loader.h>
 
 #define FILE_NAME "test/test.o"
 
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 	usize file_size;
 	struct rmld_sym prtf;
 	struct rmld_sym func;
-	struct rmld rel;
+	struct loading_env rel;
 	u8 error;
 	u32 (*fnc)(void);
 	u32 res;
@@ -63,13 +63,13 @@ int main(int argc, char *argv[])
 	
 	printf("hdr : %p\n", addr);
 	
-	rmld_ctor(&rel, addr, file_size);
+	loader_init(&rel, addr, file_size);
 	
-	error = rmld_assign_sections(&rel);
+	error = loader_assign_sections(&rel);
 	
 	printf("sections allocations : %d\n", error);
 	
-	error = rmld_assign_symbols(&rel, &prtf, &func);
+	error = loader_assign_symbols(&rel, &prtf, &func);
 	
 	printf("symbols assignment : %d\n", error);
 	

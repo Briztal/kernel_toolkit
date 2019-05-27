@@ -1,87 +1,29 @@
 /*rmld.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#include <elf64.h>
-#include <malloc.h>
-#include <rmld.h>
+#include <loader/elf64.h>
+#include <loader/loader.h>
 #include <string.h>
 
 
-static inline char *strtbl_get(struct btable *strtbl, usize index)
+static inline char *strtbl_get(struct byte_table *strtbl, usize index)
 {
 	
 	return ((char *) ptr_sum_byte_offset((strtbl->t_start), (index)));
 	
 }
 
-
-static inline void shdr_to_btable(
-	const struct rmld *ldr,
-	const struct elf64_shdr *shdr,
-	struct btable *dsc
-)
-{
-	void *start;
-	dsc->t_start = start = ptr_sum_byte_offset(ldr->r_hdr, shdr->sh_offset);
-	dsc->t_end = ptr_sum_byte_offset(start, shdr->sh_size);
-	dsc->t_bsize = (shdr)->sh_entsize;
-}
-
-
-#define FAIL_WITH(mask) {ldr->r_error |= (mask); goto error;}
-
-
-void rmld_ctor(
-	struct rmld *ldr,
-	void *ram_elf_file,
-	usize elf_file_size
-)
-{
-	
-	struct elf64_hdr *hdr;
-	u8 *shtable;
-	usize shentry_size;
-	
-	
-	/*Reset the status;*/
-	ldr->r_fstatus = RMLD_FSTATUS_DISK_IMAGE;
-	
-	/*Initialize the elf header;*/
-	ldr->r_hdr = hdr = ram_elf_file;
-	
-	/*Initialize the file size*/
-	ldr->r_file_end = ptr_sum_byte_offset(ram_elf_file, elf_file_size);
-	
-	
-	/*Determine the address of the section table;*/
-	ldr->r_shtable.t_start = shtable =
-		ptr_sum_byte_offset(ram_elf_file, hdr->e_shoff);
-	
-	/*Determine section table desc vars;*/
-	ldr->r_shtable.t_bsize = shentry_size = hdr->e_shentsize;
-	
-	/*Determine the end of the section table;*/
-	ldr->r_shtable.t_end =
-		ptr_sum_byte_offset(shtable, shentry_size * hdr->e_shnum);
-	
-}
-
-
-/*---------------------------------------------------------- general utilities*/
-
 /**
  * get_section_header : gets the reference of a section header from its index
  * 	in the section header table;
- *
- * @param ldr : a rmld;
+ * @param env : the loading environment;
  * @param section_id : the index of the section header to retrieve;
  * @param section_type : the expected type of the section; 0 to disable check;
  * @param shdr_p : the ref of the location where to store the ref of the
  * 	header;
  * @return an error code;
  */
-
 static u8 get_section_header(
-	struct rmld *ldr,
+	struct loading_env *env,
 	u16 section_id,
 	u32 section_type,
 	struct elf64_shdr **shdr_p
@@ -107,7 +49,7 @@ static u8 get_section_header(
 	}
 	
 	/*Cache the ref of the section header;*/
-	error = btable_get_bref(&ldr->r_shtable, section_id, (void **) &shdr);
+	error = byte_table_get_entry(&env->r_shtable, section_id, (void **) &shdr);
 	
 	/*If the index was invalid :*/
 	if (error) {
@@ -131,25 +73,42 @@ static u8 get_section_header(
 	/*Complete;*/
 	return 0;
 	
-	
+}
+
+
+/**
+ * shdr_to_byte_table : initializes @table with data describing the section
+ * header @shdr, related to the loading environment @env;
+ * @param env : the loading environment;
+ * @param shdr : the section header whose byte table should be extracted;
+ * @param table : the byte table where data should be saved;
+ */
+static inline void shdr_to_byte_table(
+	const struct loading_env *env,
+	const struct elf64_shdr *shdr,
+	struct byte_table *table
+)
+{
+	void *start;
+	table->t_start = start = ptr_sum_byte_offset(env->r_hdr, shdr->sh_offset);
+	table->t_end = ptr_sum_byte_offset(start, shdr->sh_size);
+	table->t_bsize = (shdr)->sh_entsize;
 }
 
 
 /**
  * get_section_table : get the table referenced by a section header;
- *
- * @param ldr : a rmld;
+ * @param env : the loading environment;
  * @param section_id : the id of the section to get the table of;
  * @param section_type : the expected type of the section, 0 to disable check;
  * @param tbl : the table descriptor to update;
  * @return an error code;
  */
-
 static u8 get_section_table(
-	struct rmld *ldr,
+	struct loading_env *env,
 	u16 section_id,
 	u32 section_type,
-	struct btable *tbl
+	struct byte_table *tbl
 )
 {
 	
@@ -157,7 +116,7 @@ static u8 get_section_table(
 	u8 error;
 	
 	/*Get the string table section header;*/
-	error = get_section_header(ldr, section_id, section_type, &shdr);
+	error = get_section_header(env, section_id, section_type, &shdr);
 	
 	/*If an error occurred, return the error code;*/
 	if (error) {
@@ -165,7 +124,7 @@ static u8 get_section_table(
 	}
 	
 	/*Update the table descriptor;*/
-	shdr_to_btable(ldr, shdr, tbl);
+	shdr_to_byte_table(env, shdr, tbl);
 	
 	/*Complete;*/
 	return 0;
@@ -173,33 +132,60 @@ static u8 get_section_table(
 }
 
 
-/*-------------------------------------------------------- sections assignment*/
+/*---------------------------------------------------------------- loader init*/
 
 /**
- * rmld_allocate_sections : allocated all NOBITS sections of the
- *  rmld's file, and update all section's values to their RAM addresses;
- *
- *  This function requires a file with sections not allocated;
- *
- * @param ldr : the rmld;
- * @return an error flag;
+ * loader_init : initializes the loading environment for the provided elf file;
+ * @param env : the environment to initialize;
+ * @param ram_start : the address of the file's first byte in RAM;
+ * @param file_size : the size in bytes of the file in RAM;
  */
-u8 rmld_assign_sections(struct rmld *ldr)
+void loader_init(
+	struct loading_env *env,
+	void *ram_start,
+	usize file_size
+)
+{
+	
+	struct elf64_hdr *hdr;
+	u8 *shtable;
+	usize shentry_size;
+	
+	/*Initialize the elf header;*/
+	env->r_hdr = hdr = ram_start;
+	
+	/*Initialize the file size*/
+	env->r_file_end = ptr_sum_byte_offset(ram_start, file_size);
+	
+	/*Determine the address of the section table;*/
+	env->r_shtable.t_start = shtable =
+		ptr_sum_byte_offset(ram_start, hdr->e_shoff);
+	
+	/*Determine section table desc vars;*/
+	env->r_shtable.t_bsize = shentry_size = hdr->e_shentsize;
+	
+	/*Determine the end of the section table;*/
+	env->r_shtable.t_end =
+		ptr_sum_byte_offset(shtable, shentry_size * hdr->e_shnum);
+	
+}
+
+
+/*-------------------------------------------------------- sections assignment*/
+
+
+/**
+ * loader_assign_sections : update all section's values to their RAM addresses;
+ * @param ldr : the loading environment;
+ * @return 0 if all section were assigned correctly, 1 if a non-empty nobits
+ * section was present; the latter should stop the loading;
+ */
+u8 loader_assign_sections(struct loading_env *ldr)
 {
 	
 	void *hdr;
-	struct btable shtable;
+	struct byte_table shtable;
 	struct elf64_shdr *shdr;
-	
-	/*If error flags are set, fail;*/
-	if (ldr->r_error) {
-		FAIL_WITH(RMLD_ERR_REDETECTION);
-	}
-	
-	/*If the file status is invalid, fail;*/
-	if (ldr->r_fstatus != RMLD_FSTATUS_DISK_IMAGE) {
-		FAIL_WITH(RMLD_ERR_INV_FSTATUS);
-	}
 	
 	/*Cache vars;*/
 	hdr = ldr->r_hdr;
@@ -214,7 +200,7 @@ u8 rmld_assign_sections(struct rmld *ldr)
 		/*If the section is not present in the file and has a non null
 		 * size, fail;*/
 		if ((shdr->sh_type == SHT_NOBITS) && (shdr->sh_size)) {
-			FAIL_WITH(RMLD_ERR_NOBITS_SECTION);
+			return LOADER_ERR_NOBITS_SECTION;
 		}
 		
 		
@@ -229,25 +215,8 @@ u8 rmld_assign_sections(struct rmld *ldr)
 		
 	}
 	
-	/*Update the file statue;*/
-	ldr->r_fstatus = RMLD_FSTATUS_SECTIONS_ALLOCATED;
-	
 	/*Complete;*/
 	return 0;
-	
-	
-	/*
-	 * Error section;
-	 */
-	
-	error :
-	
-	/*Set the error flag;*/
-	ldr->r_error |= RMLD_ERR_SECT_ASSIGN;
-	
-	/*Fail;*/
-	return 1;
-	
 	
 }
 
@@ -258,13 +227,11 @@ u8 rmld_assign_sections(struct rmld *ldr)
 /**
  * symbol_update_address : attempts to determine the address (value) of a
  * 	symbol, from its related section;
- *
- * @param ldr : a rmld;
+ * @param env : a the loading environment;
  * @param sym : the symbol to update the value of;
  */
-
-static void symbol_update_address(
-	struct rmld *ldr,
+static void update_symbol_address(
+	struct loading_env *env,
 	struct elf64_sym *sym
 )
 {
@@ -277,8 +244,8 @@ static void symbol_update_address(
 	/*Cache the symbol's section's index;*/
 	section_id = sym->sy_shndx;
 	
-	/*Get the section header;*/
-	error = get_section_header(ldr, section_id, SHT_PROGBITS, &shdr);
+	/*Get the section header; the section should contain program data*/
+	error = get_section_header(env, section_id, SHT_PROGBITS, &shdr);
 	
 	/*If an error occurred:*/
 	if (error) {
@@ -298,49 +265,52 @@ static void symbol_update_address(
 	
 }
 
-
 /**
- * assing_symtable : attempts to assign all symbols of the provided symbol
- * 	table, and then provide definitions for external undefined symbols;
- *
- * @param shtable : the descriptor of the section header table;
- * @param symtbl_hdr : the section header of the symbol table;
- * @param defs : a list of extern undefined symbols; can be null;
- * @param undefs : a list of external undefined symbols; can be null;
- *
- * @return an error code;
+ * assing_symbol_table : for each symbol in the symbol table :
+ * - if the symbol is defined updates the symbol's address internally and
+ *   updated the list of symbol queries if required;
+ * - if the symbol is not defined, search the list of external definitons
+ *   for an eventual matching symbol;
+ * It it possible that undefined symbols remain after the execution of this
+ * function. Those will have their value assigned to 0;
+ * @param env : the loading environment
+ * @param symtbl_hdr : symbol table's section header;
+ * @param definitions : a list of defined symbols, that are accessible to the
+ * executable; if undefined symbols with matching names are found in the
+ * executable, their value will be set to the value provided in the list;
+ * @param queries : a set of symbols the executable may define; if defined
+ * symbols with matching names are found in the executable, the list will be
+ * updated with the value of the symbol in the executable;
+ * @return 0 if all symbols had their value assigned, 1 if the symbol table's
+ * string table index was invalid. This case should stop the loading;
  */
-
-static u8 assing_symtable(
-	struct rmld *ldr,
+static u8 assing_symbol_table(
+	struct loading_env *env,
 	struct elf64_shdr *symtbl_hdr,
-	struct rmld_sym *defs,
-	struct rmld_sym *undefs
+	struct rmld_sym *definitions,
+	struct rmld_sym *queries
 )
 {
 	
 	u16 strtbl_id;
-	struct btable strtbl;
-	
-	struct btable symtable;
+	u8 strtbl_id_error;
+	struct byte_table strtbl;
+	struct byte_table symtable;
 	struct elf64_sym *sym;
-	
-	u8 error;
 	
 	/*Cache the string table id;*/
 	strtbl_id = (u16) symtbl_hdr->sh_link;
 	
 	/*Cache the string table;*/
-	error = get_section_table(ldr, strtbl_id, SHT_STRTAB, &strtbl);
+	strtbl_id_error = get_section_table(env, strtbl_id, SHT_STRTAB, &strtbl);
 	
-	/*If an error occurred, fail;*/
-	if (error) {
-		ldr->r_error |= RMLD_ERR_STBL_INV_STID;
-		return 1;
+	/*If the string table index was invalid, fail;*/
+	if (strtbl_id_error) {
+		return LOADER_ERR_SYMTBL_BAD_STRTBL_ID;
 	}
 	
-	/*Cache the symbol table;*/
-	shdr_to_btable(ldr, symtbl_hdr, &symtable);
+	/*Cache the symbol table descriptor;*/
+	shdr_to_byte_table(env, symtbl_hdr, &symtable);
 	
 	/*Iterate over the symbol table;*/
 	BTABLE_ITERATE(symtable, sym) {
@@ -361,12 +331,12 @@ static u8 assing_symtable(
 			
 			/*If a definition exists, update the value;
 			 * if not, set the symbol's value to 0;*/
-			sym->sy_value = (u64) sym_def_find(defs, s_name);
+			sym->sy_value = (u64) sym_def_find(definitions, s_name);
 			
 		} else {
 			
 			/*If the symbol is defined, update its value;*/
-			symbol_update_address(ldr, sym);
+			update_symbol_address(env, sym);
 			
 		}
 		
@@ -381,7 +351,7 @@ static u8 assing_symtable(
 		 */
 		
 		/*Initialise the current symbol;*/
-		ext_sym = undefs;
+		ext_sym = queries;
 		
 		/*For each external symbol:*/
 		while (ext_sym) {
@@ -411,89 +381,75 @@ static u8 assing_symtable(
 	
 }
 
+#define FAIL_WITH(mask) {env->r_error |= (mask); goto error;}
+
 
 /**
- * rmld_assign_symbols : attempts to assign each symbol of each symbol
- * 	table present in the file;
- *
- * 	A list of extern symbol definitions can be provided;
- *
- * 	This function requires a file with section allocated;
- *
- * @param ldr : the rmld;
- * @param defs : a list of extern symbol definitions; can be null;
- * @param defs : a list of external undefined symbols; can be null;
- * @return an error flag;
+ * loader_assign_symbols : for each symbol in the environment :
+ * - if the symbol is defined updates the symbol's address internally and
+ *   updated the list of symbol queries if required;
+ * - if the symbol is not defined, search the list of external definitons
+ *   for an eventual matching symbol;
+ * It it possible that undefined symbols remain after the execution of this
+ * function. Those will have their value assigned to 0;
+ * @param env : the loading environment
+ * @param definitions : a list of defined symbols, that are accessible to the
+ * executable; if undefined symbols with matching names are found in the
+ * executable, their value will be set to the value provided in the list;
+ * @param queries : a set of symbols the executable may define; if defined
+ * symbols with matching names are found in the executable, the list will be
+ * updated with the value of the symbol in the executable;
+ * @return 0 if all symbols had their value assigned, or, if a symbol table's
+ * string table index was invalid (only source of error), the index of the
+ * symbol table's section header; this error should stop the loading;
  */
-
-u8 rmld_assign_symbols(
-	struct rmld *ldr,
+u16 loader_assign_symbols(
+	struct loading_env *env,
 	struct rmld_sym *defs,
 	struct rmld_sym *undefs
 )
 {
 	
-	struct btable shtable;
-	struct elf64_shdr *shdr;
-	u8 error;
-	
-	/*If error flags are set, fail;*/
-	if (ldr->r_error) {
-		FAIL_WITH(RMLD_ERR_REDETECTION);
-	}
-	
-	/*If the file status is invalid, fail;*/
-	if (ldr->r_fstatus != RMLD_FSTATUS_SECTIONS_ALLOCATED) {
-		FAIL_WITH(RMLD_ERR_INV_FSTATUS);
-	}
+	struct byte_table shtable;
+	struct elf64_shdr *sheader;
+	u16 section_index;
 	
 	/*Cache section header table descriptor;*/
-	shtable = ldr->r_shtable;
+	shtable = env->r_shtable;
+	
+	/*Reset the section index;*/
+	section_index = 0;
 	
 	/*Iterate over the section table :*/
-	BTABLE_ITERATE(shtable, shdr) {
-		
+	BTABLE_ITERATE(shtable, sheader) {
 		
 		/*If the section holds a symbol table :*/
-		if (shdr->sh_type == SHT_SYMTAB) {
+		if (sheader->sh_type == SHT_SYMTAB) {
+			
+			u8 error;
 			
 			/*Assign symbols in the symbol table;*/
-			error = assing_symtable(ldr, shdr, defs, undefs);
+			error = assing_symbol_table(env, sheader, defs, undefs);
 			
 			/*If an error occurred, fail;*/
 			if (error) {
-				goto error;
+				return section_index;
 			}
 			
 		}
 		
+		/*Update the section index;*/
+		section_index++;
+		
 	}
-	
-	/*Update the file status;*/
-	ldr->r_fstatus = RMLD_FSTATUS_SYMBOLS_ASSIGNED;
 	
 	/*Complete;*/
 	return 0;
-	
-	
-	/*
-	 * Error section;
-	 */
-	
-	error :
-	
-	/*Set the error flag;*/
-	ldr->r_error |= RMLD_ERR_SYMB_ASSIGN;
-	
-	/*Fail;*/
-	return 1;
 	
 }
 
 
 /*--------------------------------------------------------------- relocations */
-
-
 
 
 u8 rel16(void *dst, u64 val, u8 relative)
@@ -611,7 +567,7 @@ u8 rel64(void *dst, u64 val, u8 relative)
 }
 
 u8 relocate(
-	struct rmld *ldr,
+	struct loading_env *ldr,
 	u64 rel_addr,
 	u64 sym_addr,
 	s64 addend,
@@ -656,9 +612,6 @@ u8 relocate(
 	/*Compute the relocation value;*/
 	rel_value = sym_addr + addend - rel_addr;
 	
-	printf("ldr : s %p, a %p, addr %p, val %p\n", sym_addr, addend, rel_addr,
-		   rel_value);
-	
 	/*Apply the relocation;*/
 	error = (*rel_f)((void *) rel_addr, rel_value, relative);
 	
@@ -686,31 +639,31 @@ u8 relocate(
  * @return an error flag;
  */
 
-static u8 rtbl_apply(
-	struct rmld *ldr,
+static u8 apply_reloaction_table(
+	struct loading_env *ldr,
 	struct elf64_shdr *reltbl_hdr
 )
 {
 	
 	u8 explicit_addend;
 	u8 error;
-	struct btable reltable;
+	struct byte_table reltable;
 	u16 symtbl_id;
 	
 	u16 rel_sect_id;
 	struct elf64_shdr *rel_sect_hdr;
 	u64 rel_sect_start;
 	
-	struct btable symtbl;
+	struct byte_table symtbl;
 	
 	struct elf64_rela *rel;
 	
 	
 	/*Determine whether an explicit addend is provided;*/
-	explicit_addend = (reltbl_hdr->sh_type == SHT_RELA);
+	explicit_addend = (u8) (reltbl_hdr->sh_type == SHT_RELA);
 	
 	/*Cache the relocation table;*/
-	shdr_to_btable(ldr, reltbl_hdr, &reltable);
+	shdr_to_byte_table(ldr, reltbl_hdr, &reltable);
 	
 	
 	/*Cache the symbol table header identifier;*/
@@ -732,7 +685,7 @@ static u8 rtbl_apply(
 	/*Cache the header of the section to relocate;*/
 	error = get_section_header(ldr, rel_sect_id, SHT_PROGBITS, &rel_sect_hdr);
 	
-	/*If the relocaton section index is invalid, fail;*/
+	/*If the relocation section index is invalid, fail;*/
 	if (error) {
 		ldr->r_error |= RMLD_ERR_RTBL_INV_RSID;
 		return 1;
@@ -757,7 +710,7 @@ static u8 rtbl_apply(
 		
 		/*Determine the relocation's address;*/
 		rel_addr = (u64) ptr_sum_byte_offset(rel_sect_start,
-												  rel->r_offset);
+											 rel->r_offset);
 		
 		/*Cache relocation information, get index and type;*/
 		rel_info = rel->r_info;
@@ -771,7 +724,7 @@ static u8 rtbl_apply(
 		}
 		
 		/*Cache the symbol reference;*/
-		error = btable_get_bref(&symtbl, sym_index, (void **) &sym);
+		error = byte_table_get_entry(&symtbl, sym_index, (void **) &sym);
 		
 		if (error) {
 			ldr->r_error |= RMLD_ERR_RSYM_INV_INDEX;
@@ -816,10 +769,10 @@ static u8 rtbl_apply(
  * @return an error code;
  */
 
-u8 rmld_apply_relocations(struct rmld *ldr)
+u8 rmld_apply_relocations(struct loading_env *ldr)
 {
 	
-	struct btable shtable;
+	struct byte_table shtable;
 	struct elf64_shdr *shdr;
 	
 	/*If error flags are set, fail;*/
@@ -849,10 +802,8 @@ u8 rmld_apply_relocations(struct rmld *ldr)
 			
 			u8 error;
 			
-			printf("found reltable\n");
-			
 			/*Attempt to apply relocations;*/
-			error = rtbl_apply(ldr, shdr);
+			error = apply_reloaction_table(ldr, shdr);
 			
 			/*If an error occurred, fail;*/
 			if (error) {

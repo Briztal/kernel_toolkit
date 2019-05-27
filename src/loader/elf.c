@@ -1,6 +1,8 @@
 /*elf.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#include <elf.h>
+#include <types.h>
+
+#include <loader/elf.h>
 
 
 /**
