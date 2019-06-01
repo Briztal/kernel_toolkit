@@ -327,8 +327,8 @@ static void mgr_unregister_task(struct taskman_task *task)
 {
 	
 	/*Insert the task in the tasks tree;*/
-	avl_remove();
-	TODO;
+	/*avl_remove();
+	TODO;*/
 	
 }
 

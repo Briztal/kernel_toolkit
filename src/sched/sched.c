@@ -2,16 +2,16 @@
 
 #include <sched/sched.h>
 
-#include <debug.h>
 
 #include <spinlock.h>
+#include <check.h>
 
 
 /*-------------------------------------------------------------- active checks*/
 
 static __inline__ u8 task_active(struct stask *task) {
 
-	return (task->t_commit == task->t_process->p_sched->s_commit_index);
+	return (u8) (task->t_commit == task->t_process->p_sched->s_commit_index);
 
 }
 
@@ -19,8 +19,8 @@ static __inline__ u8 task_active(struct stask *task) {
 
 static __inline__ u8 thread_active(struct sthread *proc) {
 
-	return (proc->t_commit == proc->t_sched->s_commit_index) &&
-		   (proc->t_task != 0);
+	return (u8) ((proc->t_commit == proc->t_sched->s_commit_index) &&
+		   (proc->t_task != 0));
 
 }
 
@@ -710,6 +710,9 @@ err_t process_unregister_prim(struct sprim *prim) {
 
 	/*Report the un-registration;*/
 	prc->p_nb_primitives--;
+	
+	/*Complete if the primitive owns some tasks;*/
+	return (u8) (prim->p_nb_owning_tasks != 0);
 
 }
 
@@ -998,13 +1001,8 @@ u8 sched_lock(struct scheduler *sched) {
  */
 void sched_unlock(struct scheduler *sched) {
 	
-	u8 unlock_error;
-
 	/*Unlock the scheduler;*/
-	unlock_error = arch_spin_unlock(&sched->s_lock);
-
-	/*Check the scheduler was locked;*/
-	ns_check(unlock_error == 0);
+	arch_spin_unlock(&sched->s_lock);
 
 }
 

@@ -1,7 +1,7 @@
 /*sem.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#ifndef KERNELTK_SEM_H
-#define KERNELTK_SEM_H
+#ifndef KERNEL_TK_SEM_H
+#define KERNEL_TK_SEM_H
 
 #include "sched.h"
 
@@ -71,4 +71,4 @@ static __inline__ u8 sched_sem_is_locked(struct sched_sem *sem) {
 err_t sched_sem_release(struct sched_sem *sem, struct sthread *thread);
 
 
-#endif //KERNELTK_SEM_H
+#endif /*KERNEL_TK_SEM_H*/

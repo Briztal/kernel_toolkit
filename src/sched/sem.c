@@ -1,7 +1,8 @@
 /*sem.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
 #include <sched/sem.h>
-#include <debug.h>
+
+#include <check.h>
 
 /**
  * sched_sem_ctor : constructs the semaphore with the provided number of
@@ -118,8 +119,8 @@ err_t sched_sem_release(struct sched_sem *sem, struct sthread *thread) {
 		);
 
 	}
+	
+	/*Complete;*/
+	return 0;
 
 }
-
-
-#endif //KERNELTK_SEM_H

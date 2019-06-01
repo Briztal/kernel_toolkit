@@ -1,7 +1,7 @@
 /*mutx.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#ifndef KERNELTK_MUTEX_H
-#define KERNELTK_MUTEX_H
+#ifndef KERNEL_TK_MUTEX_H
+#define KERNEL_TK_MUTEX_H
 
 #include "sched.h"
 
@@ -63,4 +63,4 @@ static __inline__ u8 sched_mutex_is_locked(struct sched_mutex *mutex) {
 err_t sched_mutex_unlock(struct sched_mutex *mutex, struct sthread *thread);
 
 
-#endif //KERNELTK_MUTEX_H
+#endif /*KERNEL_TK_MUTEX_H*/

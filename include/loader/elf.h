@@ -1,7 +1,7 @@
 /*elf.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#ifndef KERNELTK_ELF_H
-#define KERNELTK_ELF_H
+#ifndef KERNEL_TK_ELF_H
+#define KERNEL_TK_ELF_H
 
 #include <types.h>
 
@@ -447,4 +447,4 @@ rel_error_t elf_identifier_check(struct elf_identifier *, u8 elf_64);
 
 
 
-#endif /*KERNELTK_ELF_H*/
+#endif /*KERNEL_TK_ELF_H*/

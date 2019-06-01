@@ -1,0 +1,93 @@
+
+
+#--------------------------------------------------------------------- mftk init
+
+#If mftk is not provided, fail;
+ifndef __MFTK__
+$(error kerneltk build node requires mftk)
+endif
+
+#Include mftk;
+include $(__MFTK__)
+
+#------------------------------------------------------------------------- entry
+
+$(eval $(call mftk.node.entry,kerneltk,build_dir build_arch nostd_inc_dir))
+
+$(eval $(call mftk.check.path,kerneltk.build_dir))
+
+$(eval $(call mftk.check.path,kerneltk.nostd_inc_dir))
+
+#------------------------------------------------------------------- directories
+
+#Create locals for often used directories;
+KT_OUT := $(kerneltk.build_dir)
+KT_SRC := $(kerneltk.build_dir)/src
+KT_OBJ := $(kerneltk.build_dir)/obj
+
+#--------------------------------------------------------------------- toolchain
+
+#Transmit the architecture to compile for;
+$(eval $(call mftk.utility.define,toolchain,target,$(kerneltk.build_arch)))
+
+#Call the toolchain utility;
+$(eval $(call mftk.utility.execute,toolchain))
+
+#----------------------------------------------------------- compilation options
+
+#The compilation will use sources in the output directory;
+INC := -I$(KT_OUT)/include/ -I$(kerneltk.nostd_inc_dir)
+
+#Update compilation flags;
+CFLAGS += -std=c89 -Wall -pedantic -O3 -nostdinc -nostdlib -nodefaultlibs
+
+#If the compilation should be made in debug mode, add the flag;
+ifdef kerneltk.debug
+CFLAGS += -DDEBUG
+endif
+
+#All files are built ith the same options; this shortcut factorises;
+KT_CC = $(CC) $(INC) $(CFLAGS)
+
+#----------------------------------------------------- processor dependent files
+
+#The type of processor will be used to choose processor dependent files;
+PROC_TYPE :=
+
+#Cross make is used, with the arch environment
+$(eval $(call mftk.utility.define,cross_make,environment,arch))
+
+#architecture dependent makefiles can be found in the arch directory;
+$(eval $(call mftk.utility.define,cross_make,directory,$(.wdir)/arch))
+
+#Transfer our target
+$(eval $(call mftk.utility.define,cross_make,target,$(kerneltk.build_arch)))
+
+#Call cross make; It should include makefiles that define the processor type;
+$(eval $(call mftk.utility.execute,cross_make))
+
+#If the processor type has not been defined, fail;
+$(eval $(call mftk.require_defined,PROC_TYPE,kerneltk))
+
+#------------------------------------------------------------------------- build
+
+.phony: kerneltk
+kerneltk:
+
+	mkdir -p $(KT_OUT)
+	mkdir -p $(KT_OBJ)
+
+	cp -r include/ $(KT_OUT)/
+	cp -r src/ $(KT_OUT)/
+	cp arch/rel_$(PROC_TYPE).c $(KT_OUT)/src/loader/rel.c
+
+	$(KT_CC) -c $(KT_SRC)/loader/elf.c -o $(KT_OBJ)/elf.o
+	$(KT_CC) -c $(KT_SRC)/loader/loader.c -o $(KT_OBJ)/loader.o
+	$(KT_CC) -c $(KT_SRC)/loader/rel.c -o $(KT_OBJ)/rel.o
+
+	$(KT_CC) -c $(KT_SRC)/sched/sched.c -o $(KT_OBJ)/sched.o
+	$(KT_CC) -c $(KT_SRC)/sched/mutex.c -o $(KT_OBJ)/mutex.o
+	$(KT_CC) -c $(KT_SRC)/sched/sem.c -o $(KT_OBJ)/sem.o
+
+
+	$(AR) -cr -o $(KT_OUT)/kerneltk.ar $(KT_OBJ)/*

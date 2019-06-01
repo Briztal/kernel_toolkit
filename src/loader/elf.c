@@ -14,7 +14,6 @@ rel_error_t elf_ident_check(struct elf_identifier *ident, u8 elf_class)
 {
 	
 	u16 ident_lsb;
-	u8 ei_class;
 	u8 ei_data;
 	u8 proc_little_endian;
 	u8 elf_little_endian;
@@ -35,7 +34,7 @@ rel_error_t elf_ident_check(struct elf_identifier *ident, u8 elf_class)
 		
 	}
 	
-	/*Cache ei_data;*/
+	/*Fetch ei_data;*/
 	ei_data = ident->ei_data;
 	
 	/*If the data format is unknown :*/
@@ -66,8 +65,8 @@ rel_error_t elf_ident_check(struct elf_identifier *ident, u8 elf_class)
 	/*little endian : lsb of ident_lsb is ELFMAG0*/
 	proc_little_endian = (u8) (((u8) (ident_lsb)) == ELFMAG0);
 	
-	/*Cache elf endianness;*/
-	elf_little_endian = (ei_data == ELFDATA2LSB);
+	/*Fetch elf endianness;*/
+	elf_little_endian = (u8) (ei_data == ELFDATA2LSB);
 	
 	/*If endiannesses differ, set the related flag;*/
 	if (proc_little_endian != elf_little_endian) {

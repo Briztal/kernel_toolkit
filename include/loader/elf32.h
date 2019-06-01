@@ -1,8 +1,8 @@
 /*elf32.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
 
-#ifndef KERNELTK_ELF32_H
-#define KERNELTK_ELF32_H
+#ifndef KERNEL_TK_ELF32_H
+#define KERNEL_TK_ELF32_H
 
 #include <loader/elf.h>
 

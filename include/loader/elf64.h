@@ -1,7 +1,7 @@
 /*elf64.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#ifndef KERNELTK_ELF64_H
-#define KERNELTK_ELF64_H
+#ifndef KERNEL_TK_ELF64_H
+#define KERNEL_TK_ELF64_H
 
 #include <loader/elf.h>
 
@@ -217,4 +217,4 @@ struct elf64_rela {
 
 
 
-#endif /*KERNELTK_ELF64_H*/
+#endif /*KERNEL_TK_ELF64_H*/

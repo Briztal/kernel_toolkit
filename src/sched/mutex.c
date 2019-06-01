@@ -2,8 +2,8 @@
 
 
 #include <sched/mutex.h>
-#include <debug.h>
 
+#include <check.h>
 
 /**
  * sched_mutex_ctor : constructs and registers the mutex to the provided
@@ -152,6 +152,3 @@ err_t sched_mutex_unlock(struct sched_mutex *mutex, struct sthread *thread) {
 	return 0;
 
 }
-
-
-#endif //KERNELTK_MUTEX_H

@@ -1,5 +1,8 @@
 /*sched.h - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
+#ifndef KERNELTK_SCHED_H
+#define KERNELTK_SCHED_H
+
 #include <types.h>
 
 #include <struct/list.h>
@@ -29,7 +32,7 @@ enum sched_status {
 			SCHED_STATUS_STOPPED = 1,
 
 	/*The object is active;*/
-			SCHED_STATUS_ACTIVE = 2,
+			SCHED_STATUS_ACTIVE = 2
 
 };
 
@@ -572,3 +575,4 @@ void primitive_resume_task(struct stask *task);
  */
 void primitive_stop_thread(struct sprim *prim, struct sthread *thread);
 
+#endif /*KERNELTK_SCHED_H*/

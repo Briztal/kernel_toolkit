@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
 	int fd;
 	struct stat sb;
 	usize file_size;
-	struct rmld_sym prtf;
-	struct rmld_sym func;
+	struct loader_symbol prtf;
+	struct loader_symbol func;
 	struct loading_env rel;
 	u8 error;
 	u32 (*fnc)(void);
