@@ -151,13 +151,11 @@ u8 loader_apply_relocation(
 	 *  - update operands to fit the generic value calculation;
 	 */
 	switch (rel_type) {
-
-
+		
 		case 2: /*R_AMD64_PC32 :*/
 			rel_f = &rel32;
 			relative = 1;
 			break;
-
 
 		case 4:    /*R_AMD64_PLT32 :*/
 			rel_f = &rel32;

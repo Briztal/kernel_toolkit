@@ -3,9 +3,11 @@ include /root/projects/mftk/mftk.mk
 $(eval $(call mftk.utility.define,toolchain,target,x86_64))
 $(eval $(call mftk.utility.execute,toolchain))
 
-INC := -Iinclude/
+INC := -Ibuild/nostd/include -Ibuild/kerneltk/include
 
-CFLAGS += -std=c89 -Wall -pedantic -O3 -nostdinc -nostdlib -nodefaultlibs -nolibc
+CFLAGS += -std=c89 -Wall -pedantic -O3
+
+TCC := $(CC) $(INC) $(CFLAGS)
 
 TS_BDIR = build/test
 
@@ -20,7 +22,7 @@ $(eval $(call mftk.node.define,kerneltk,0,debug,1))
 
 kerneltk.nostd.ar :
 	rm -rf build/nostd
-	$(call mftk.node.execute,nostd,0,nostd,)
+	$(call mftk.node.execute,nostd,0,all,)
 
 kerneltk.ar :
 	rm -rf build/kerneltk
@@ -29,4 +31,9 @@ kerneltk.ar :
 clean:
 	rm -rf build
 
-all: clean kerneltk.nostd.ar kerneltk.ar
+test: clean kerneltk.nostd.ar kerneltk.ar
+	$(TCC) -o test/main.o -c test/main.c
+	$(TCC) -o test/main.elf test/main.o build/kerneltk/kerneltk.ar build/nostd/nostd.ar
+	test/main.elf
+
+all: test

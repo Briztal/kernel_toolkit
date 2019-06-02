@@ -7,6 +7,11 @@
 
 #include <string.h>
 
+#define DEBUG 1
+
+#include <debug.h>
+
+
 /*TODO CHECKS*/
 /*TODO CHECKS*/
 /*TODO CHECKS*/
@@ -43,8 +48,56 @@ static __inline__ u8 check_section_index(u16 index)
  * @param env : the loading environment;
  * @param err_type : the type of error to throw;
  */
-static __inline__ void loading_error(struct loading_env *env, u8 err_type) {
+static __inline__ void loading_error(struct loading_env *env, u8 err_type)
+{
 	throw_error(env->r_error_ctx, err_type);
+}
+
+/*----------------------------------------------------------------- debug only*/
+
+
+static const char *section_name(
+	struct loading_env *env, struct elf64_shdr *shdr
+)
+{
+	
+	struct elf64_hdr *hdr;
+	struct elf64_shdr *str_hdr;
+	
+	/*Cache the elf header;*/
+	hdr = env->r_hdr;
+	
+	/*Cache the string section header;*/
+	str_hdr = ptr_sum_byte_offset(
+		hdr,
+		hdr->e_shoff + hdr->e_shstrndx * hdr->e_shentsize
+	);
+	
+	return ptr_sum_byte_offset(hdr, str_hdr->sh_offset + shdr->sh_name);
+	
+}
+
+
+static const char *symbol_name(
+	struct loading_env *env, struct elf64_shdr *shdr, struct elf64_sym *sym
+) {
+	
+	
+	struct elf64_hdr *hdr;
+	struct elf64_shdr *str_hdr;
+	
+	/*Cache the elf header;*/
+	hdr = env->r_hdr;
+	
+	/*Cache the string section header;*/
+	str_hdr = ptr_sum_byte_offset(
+		hdr,
+		hdr->e_shoff + shdr->sh_link * hdr->e_shentsize
+	);
+	
+	return ptr_sum_byte_offset(hdr, str_hdr->sh_offset + sym->sy_name);
+	
+	
 }
 
 /*---------------------------------------------------------------- loader init*/
@@ -94,7 +147,6 @@ u8 loader_assign_sections(
 	struct loading_env *env
 )
 {
-	
 	void *hdr;
 	struct elf_table shtable;
 	struct elf64_shdr *shdr;
@@ -103,11 +155,15 @@ u8 loader_assign_sections(
 	hdr = env->r_hdr;
 	shtable = env->r_shtable;
 	
+	debug_("loader assigning sections");
+	
 	/*Iterate over the section table :*/
 	TABLE_ITERATE(shtable, shdr) {
 		
 		void *address;
 		u64 offset;
+		
+		debug("assigning section %s", section_name(env, shdr));
 		
 		/*If the section is of type nobits, with non-null size, fail;*/
 		if ((shdr->sh_type == SHT_NOBITS) && (shdr->sh_size != 0))
@@ -122,7 +178,11 @@ u8 loader_assign_sections(
 		/*Update the section's address;*/
 		shdr->sh_addr = (u64) address;
 		
+		debug("assigned at %h", address);
+		
 	}
+	
+	debug_("loader done assigning sections");
 	
 	/*Complete;*/
 	return 0;
@@ -199,7 +259,8 @@ static struct elf64_shdr *__get_section_header(
 static void __section_header_to_table(
 	struct loading_env *env,
 	struct elf64_shdr *hdr,
-	struct elf_table *table
+	struct elf_table *table,
+	u8 byte_table
 )
 {
 	
@@ -209,43 +270,19 @@ static void __section_header_to_table(
 	/*Cache the entry size;*/
 	ent_size = hdr->sh_entsize;
 	
-	/*If the entry size is null, fail;*/
+	/*If the entry size is null, fail or set it to 1;*/
 	if (!ent_size) {
-		loading_error(env, LOADER_ERR_TYPE_SECT_ENTSIZE_NULL);
+		if (byte_table) {
+			ent_size = 1;
+		} else {
+			loading_error(env, LOADER_ERR_TYPE_SECT_ENTSIZE_NULL);
+		}
 	}
 	
 	/*Initialize the table;*/
 	table->t_start = start = ptr_sum_byte_offset(env->r_hdr, hdr->sh_offset);
 	table->t_end = ptr_sum_byte_offset(start, hdr->sh_size);
-	table->t_bsize = (hdr)->sh_entsize;
-	
-}
-
-/**
- * __get_section_table : calls the section header fetch function and the table
- * data extraction function;
- * @param env : the loading environment;
- * @param section_id : the subscript of the section to fetch the table of in
- * the section header table;
- * @param section_type : the expected type of the section, 0 to ignore the
- * check;
- * @param table : the location where to save table data;
- */
-static void __get_section_table(
-	struct loading_env *env,
-	u16 section_id,
-	u32 section_type,
-	struct elf_table *table
-)
-{
-	
-	struct elf64_shdr *hdr;
-	
-	/*Get the string table section header;*/
-	hdr = __get_section_header(env, section_id, section_type);
-	
-	/*Fetch table data;*/
-	__section_header_to_table(env, hdr, table);
+	table->t_bsize = ent_size;
 	
 }
 
@@ -298,8 +335,13 @@ static void update_symbol_address(
 	u8 bad_index;
 	usize value;
 	
+	/*Reset the value;*/
+	value = 0;
+	
 	/*Fetch the symbol's section's index;*/
 	section_id = sym->sy_shndx;
+	
+	debug("related to section at index %h", section_id);
 	
 	/*Check the section index;*/
 	bad_index = check_section_index(section_id);
@@ -307,16 +349,26 @@ static void update_symbol_address(
 	/*If the index is invalid :*/
 	if (bad_index) {
 		
-		/*Reset the symbol value;*/
-		value = 0;
+		debug("bad section index : %d", section_id);
 		
 	} else {
 		
-		/*Get the section header; the section should contain program data*/
-		shdr = __get_section_header(env, section_id, SHT_PROGBITS);
 		
-		/*If the offset is valid determine the symbol's address;*/
-		value = sym->sy_value + shdr->sh_addr;
+		/*Get the section header; the section should contain program data*/
+		shdr = __get_section_header(env, section_id, 0);
+		
+		if (shdr->sh_type == SHT_PROGBITS) {
+			
+			debug("assigning to section : %s", section_name(env, shdr));
+			
+			/*If the offset is valid determine the symbol's address;*/
+			value = sym->sy_value + shdr->sh_addr;
+			
+		} else {
+			
+			debug("section %s holds no prog_bits : %d", section_name(env, shdr), shdr->sh_type);
+			
+		}
 		
 	}
 	
@@ -353,17 +405,23 @@ static void assing_symbol_table(
 	struct elf_table symtable;
 	
 	u16 str_table_index;
+	struct elf64_shdr *str_table_hdr;
 	struct elf_table str_table;
 	struct elf64_sym *sym;
 	
+	debug("assigning symbols in %s", section_name(env, sym_table_header));
+	
 	/*Fetch the symbol table;*/
-	__section_header_to_table(env, sym_table_header, &symtable);
+	__section_header_to_table(env, sym_table_header, &symtable, 0);
 	
 	/*Fetch the string table id;*/
 	str_table_index = (u16) sym_table_header->sh_link;
 	
-	/*Fetch the string table;*/
-	__get_section_table(env, str_table_index, SHT_STRTAB, &str_table);
+	/*Get the string table section header;*/
+	str_table_hdr = __get_section_header(env, str_table_index, SHT_STRTAB);
+	
+	/*Fetch table data;*/
+	__section_header_to_table(env, str_table_hdr, &str_table, 1);
 	
 	/*Iterate over the symbol table;*/
 	TABLE_ITERATE(symtable, sym) {
@@ -378,8 +436,12 @@ static void assing_symbol_table(
 		 * Internal symbol definition;
 		 */
 		
+		debug("symbol %s", s_name);
+		
 		/*If the symbol is undefined :*/
 		if (sym->sy_shndx == SHN_UNDEF) {
+			
+			debug("undefined, searching for external def", s_name);
 			
 			/*If a definition exists, update the value;
 			 * if not, set the symbol's value to 0;*/
@@ -392,8 +454,11 @@ static void assing_symbol_table(
 			
 		}
 		
+		debug("assigned at %h", sym->sy_value);
+		
 		/*If the symbol's value is null, stop here;*/
 		if (!sym->sy_value) {
+			
 			continue;
 		}
 		
@@ -448,7 +513,7 @@ static void assing_symbol_table(
  * string table index was invalid (only source of error), the index of the
  * symbol table's section header; this error should stop the loading;
  */
-u16 loader_assign_symbols(
+u8 loader_assign_symbols(
 	struct loading_env *env,
 	struct loader_symbol *defs,
 	struct loader_symbol *undefs
@@ -458,6 +523,8 @@ u16 loader_assign_symbols(
 	struct elf_table shtable;
 	struct elf64_shdr *sheader;
 	u8 error_id;
+	
+	debug_("loader assigning symbols");
 	
 	try(ctx, error_id) {
 			
@@ -483,7 +550,10 @@ u16 loader_assign_symbols(
 			
 		}
 	
+	
 	try_end
+	
+	debug_("loader done assigning symbols");
 	
 	/*Reset the internal error context to avoid scope escapism;*/
 	env->r_error_ctx = 0;
@@ -538,27 +608,36 @@ static void apply_reloaction_table(
 	struct elf64_shdr *rel_sect_hdr;
 	u64 rel_sect_start;
 	
-	struct elf_table symtbl;
+	struct elf64_shdr *sym_table_hdr;
+	struct elf_table sym_table;
 	struct elf64_rela *rel;
 	
+	debug("applying relocations in %s", section_name(env, rel_table_hdr));
 	
 	/*Determine whether an explicit addend is provided;*/
 	explicit_addend = (u8) (rel_table_hdr->sh_type == SHT_RELA);
 	
 	/*Fetch the relocation table;*/
-	__section_header_to_table(env, rel_table_hdr, &reltable);
+	__section_header_to_table(env, rel_table_hdr, &reltable, 0);
 	
 	/*Fetch the symbol table header identifier;*/
 	symtbl_id = (u16) rel_table_hdr->sh_link;
 	
 	/*Fetch the symbol table;*/
-	__get_section_table(env, symtbl_id, SHT_SYMTAB, &symtbl);
+	sym_table_hdr = __get_section_header(env, symtbl_id, SHT_SYMTAB);
+	
+	debug("using symbols from table %s", section_name(env, sym_table_hdr));
+	
+	/*Fetch table data;*/
+	__section_header_to_table(env, sym_table_hdr, &sym_table, 0);
 	
 	/*Fetch the index of the section to relocate;*/
 	rel_sect_id = (u16) rel_table_hdr->sh_info;
 	
 	/*Fetch the header of the section to relocate;*/
 	rel_sect_hdr = __get_section_header(env, rel_sect_id, SHT_PROGBITS);
+	
+	debug("updating content of section %s", section_name(env, rel_sect_hdr));
 	
 	/*Fetch the start and size of the section whose content will be changed;*/
 	rel_sect_start = rel_sect_hdr->sh_addr;
@@ -587,7 +666,7 @@ static void apply_reloaction_table(
 			loading_error(env, LOADER_ERROR_REL_SYMBOL_NULL_INDEX);
 		
 		/*Fetch the symbol reference;*/
-		sym = __get_table_entry(env, &symtbl, sym_index);
+		sym = __get_table_entry(env, &sym_table, sym_index);
 		
 		/*Fetch the symbol's value;*/
 		sym_addr = sym->sy_value;
@@ -598,6 +677,10 @@ static void apply_reloaction_table(
 		
 		/*Initialise the addend;*/
 		addend = (explicit_addend) ? rel->r_addend : 0;
+		
+		debug("applying relocation of type %d at %h with addend %h using "
+				  "symbol %s of value %h ",rel_type, rel_addr, addend,
+			  symbol_name(env, sym_table_hdr, sym), sym_addr);
 		
 		/*Apply the relocation;*/
 		rel_error = loader_apply_relocation(
@@ -614,7 +697,7 @@ static void apply_reloaction_table(
 }
 
 /**
- * apply_reloaction_table : for each relocation in the environment, verifies
+ * loader_apply_relocations : for each relocation in the environment, verifies
  * the relocation can be applied (symbol valid and defined), then calls the
  * processor-defined function @loader_apply_relocation, to actually apply the
  * relocation.
@@ -623,7 +706,7 @@ static void apply_reloaction_table(
  * @param reltbl_hdr : the relocation table header;
  * @return an loading error code;
  */
-u8 rmld_apply_relocations(struct loading_env *env)
+u8 loader_apply_relocations(struct loading_env *env)
 {
 	
 	struct elf_table shtable;
@@ -632,6 +715,8 @@ u8 rmld_apply_relocations(struct loading_env *env)
 	
 	/*Fetch the symbol table descriptor;*/
 	shtable = env->r_shtable;
+	
+	debug_("loader applying relocations");
 	
 	try(ctx, error_id) {
 			
@@ -660,6 +745,8 @@ u8 rmld_apply_relocations(struct loading_env *env)
 		}
 	
 	try_end
+	
+	debug_("loader done applying relocations");
 	
 	/*Reset the internal error context to avoid scope escapism;*/
 	env->r_error_ctx = 0;

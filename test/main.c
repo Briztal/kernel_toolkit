@@ -5,7 +5,8 @@
 #include <stdlib.h>
 
 #include <unistd.h>
-#include <elf.h>
+
+#include <loader/elf.h>
 #include <loader/loader.h>
 
 #define FILE_NAME "test/test.o"
@@ -63,7 +64,7 @@ int main(int argc, char *argv[])
 	
 	printf("hdr : %p\n", addr);
 	
-	loader_init(&rel, addr, file_size);
+	loader_init(&rel, addr);
 	
 	error = loader_assign_sections(&rel);
 	
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
 	
 	printf("symbols assignment : %d\n", error);
 	
-	error = rmld_apply_relocations(&rel);
+	error = loader_apply_relocations(&rel);
 	
 	printf("rellocation application : %d\n", error);
 	
@@ -85,7 +86,6 @@ int main(int argc, char *argv[])
 	
 	res = (*fnc)();
 	
-	
 	printf("called : %d\n", res);
 	
 	close(fd);
@@ -94,3 +94,11 @@ int main(int argc, char *argv[])
 	
 }
 
+
+void ns_log(const char *str) {
+	printf("%s", str);
+}
+
+void ns_abort() {
+	abort();
+}

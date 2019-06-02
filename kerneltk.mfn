@@ -39,7 +39,7 @@ $(eval $(call mftk.utility.execute,toolchain))
 INC := -I$(KT_OUT)/include/ -I$(kerneltk.nostd_inc_dir)
 
 #Update compilation flags;
-CFLAGS += -std=c89 -Wall -pedantic -O3 -nostdinc -nostdlib -nodefaultlibs
+CFLAGS += -std=c89 -Wall -Wno-variadic-macros -pedantic -O3 -nostdinc -nostdlib -nodefaultlibs
 
 #If the compilation should be made in debug mode, add the flag;
 ifdef kerneltk.debug

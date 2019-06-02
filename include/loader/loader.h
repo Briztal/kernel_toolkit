@@ -134,14 +134,14 @@ u8 loader_assign_sections(
  * string table index was invalid (only source of error), the index of the
  * symbol table's section header; this error should stop the loading;
  */
-u16 loader_assign_symbols(
+u8 loader_assign_symbols(
 	struct loading_env *env,
 	struct loader_symbol *defs,
 	struct loader_symbol *undefs
 );
 
 /**
- * apply_reloaction_table : for each relocation in the environment, verifies
+ * loader_apply_relocations : for each relocation in the environment, verifies
  * the relocation can be applied (symbol valid and defined), then calls the
  * processor-defined function @loader_apply_relocation, to actually apply the
  * relocation.
@@ -150,7 +150,7 @@ u16 loader_assign_symbols(
  * @param reltbl_hdr : the relocation table header;
  * @return an loading error code;
  */
-u8 rmld_apply_relocations(struct loading_env *env);
+u8 loader_apply_relocations(struct loading_env *env);
 
 
 #endif /*KERNEL_TK_LOADER_H*/

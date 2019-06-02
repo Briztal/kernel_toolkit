@@ -1,8 +1,8 @@
 /*sem.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
-#include <sched/sem.h>
+#include <debug.h>
 
-#include <check.h>
+#include <sched/sem.h>
 
 /**
  * sched_sem_ctor : constructs the semaphore with the provided number of
@@ -17,8 +17,8 @@ void sched_sem_ctor(
 ) {
 
 	/*Args check;*/
-	ns_check(sem);
-	ns_check(prc);
+	check(sem);
+	check(prc);
 
 	/*Initialize and register the semaphore;*/
 	sem->s_nb_owners = nb_takings;
@@ -35,8 +35,8 @@ void sched_sem_ctor(
 void sched_sem_take(struct sched_sem *sem, struct sthread *thread) {
 
 	/*Args check;*/
-	ns_check(sem);
-	ns_check(thread);
+	check(sem);
+	check(thread);
 
 	/*If the semaphore is not available :*/
 	if (sem->s_prim.p_nb_owning_tasks == sem->s_nb_owners) {
@@ -65,8 +65,8 @@ void sched_sem_take(struct sched_sem *sem, struct sthread *thread) {
 u8 sched_sem_take_nb(struct sched_sem *sem, struct sthread *thread) {
 
 	/*Args check;*/
-	ns_check(sem);
-	ns_check(thread);
+	check(sem);
+	check(thread);
 
 	/*If the semaphore is not available, fail;*/
 	if (sem->s_prim.p_nb_owning_tasks == sem->s_nb_owners) {
@@ -99,8 +99,8 @@ err_t sched_sem_release(struct sched_sem *sem, struct sthread *thread) {
 	err_t error;
 
 	/*Args check;*/
-	ns_check(sem);
-	ns_check(thread);
+	check(sem);
+	check(thread);
 
 	/*Release the ownership of the primitive;*/
 	error = primitive_release_ownership(&sem->s_prim, thread->t_task);

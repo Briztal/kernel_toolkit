@@ -1,9 +1,9 @@
 /*mutex.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
+#include <debug.h>
 
 #include <sched/mutex.h>
 
-#include <check.h>
 
 /**
  * sched_mutex_ctor : constructs and registers the mutex to the provided
@@ -14,8 +14,8 @@
 void sched_mutex_ctor(struct sched_mutex *mutex, struct sprocess *prc) {
 
 	/*Args check;*/
-	ns_check(mutex);
-	ns_check(prc);
+	check(mutex);
+	check(prc);
 
 	/*Register the primitive to the scheduler;*/
 	process_register_prim(prc, &mutex->m_prim);
@@ -32,8 +32,8 @@ void sched_mutex_ctor(struct sched_mutex *mutex, struct sprocess *prc) {
 void sched_mutex_lock(struct sched_mutex *mutex, struct sthread *thread) {
 
 	/*Args check;*/
-	ns_check(mutex);
-	ns_check(thread);
+	check(mutex);
+	check(thread);
 
 	/*If the mutex is locked :*/
 	if (mutex->m_prim.p_nb_owning_tasks) {
@@ -63,8 +63,8 @@ void sched_mutex_lock(struct sched_mutex *mutex, struct sthread *thread) {
 u8 sched_mutex_lock_nb(struct sched_mutex *mutex, struct sthread *thread) {
 
 	/*Args check;*/
-	ns_check(mutex);
-	ns_check(thread);
+	check(mutex);
+	check(thread);
 
 	/*If the mutex is locked :*/
 	if (mutex->m_prim.p_nb_owning_tasks) {
@@ -103,8 +103,8 @@ err_t sched_mutex_unlock(struct sched_mutex *mutex, struct sthread *thread) {
 	err_t error;
 
 	/*Args check;*/
-	ns_check(mutex);
-	ns_check(thread);
+	check(mutex);
+	check(thread);
 
 	/*Fetch the task and the owner of the mutex;*/
 	task = thread->t_task;

@@ -1,10 +1,10 @@
 /*sched.c - kerneltk - GPLV3, copyleft 2019 Raphael Outhier;*/
 
+#include <debug.h>
+
 #include <sched/sched.h>
 
-
 #include <spinlock.h>
-#include <check.h>
 
 
 /*-------------------------------------------------------------- active checks*/
@@ -173,7 +173,7 @@ void thread_assign_task(struct sthread *thread, struct stask *task) {
 	struct scheduler *sched;
 
 	/*Parameters check;*/
-	ns_check(thread != 0);
+	check(thread != 0);
 
 	/*If the processor must be deactivated :*/
 	if (!task) {
@@ -193,9 +193,9 @@ void thread_assign_task(struct sthread *thread, struct stask *task) {
 	sched = thread->t_sched;
 
 	/*Check objects are registered to the same scheduler;*/
-	ns_check(sched != 0);
-	ns_check(task->t_process != 0);
-	ns_check(task->t_process->p_sched == sched);
+	check(sched != 0);
+	check(task->t_process != 0);
+	check(task->t_process->p_sched == sched);
 
 	/*If the task must be transferred :*/
 	if (task->t_thread != thread) {
@@ -237,12 +237,12 @@ void thread_assign_task(struct sthread *thread, struct stask *task) {
 void primitive_take_ownership(struct sprim *prim, struct stask *task) {
 
 	/*Debug checks;*/
-	ns_check(task != 0)
-	ns_check(prim != 0)
-	ns_check(task->t_process != 0);
-	ns_check(prim->p_process == task->t_process);
-	ns_check(task->t_process->p_sched != 0);
-	ns_check(task->t_status == SCHED_STATUS_ACTIVE);
+	check(task != 0)
+	check(prim != 0)
+	check(task->t_process != 0);
+	check(prim->p_process == task->t_process);
+	check(task->t_process->p_sched != 0);
+	check(task->t_status == SCHED_STATUS_ACTIVE);
 
 	/*Increase the couple of ownership counters;*/
 	prim->p_nb_owning_tasks++;
@@ -262,12 +262,12 @@ void primitive_take_ownership(struct sprim *prim, struct stask *task) {
 err_t primitive_release_ownership(struct sprim *prim, struct stask *task) {
 
 	/*Debug checks;*/
-	ns_check(task != 0)
-	ns_check(prim != 0)
-	ns_check(task->t_process != 0);
-	ns_check(prim->p_process == task->t_process);
-	ns_check(task->t_process->p_sched != 0);
-	ns_check(task->t_status == SCHED_STATUS_ACTIVE);
+	check(task != 0)
+	check(prim != 0)
+	check(task->t_process != 0);
+	check(prim->p_process == task->t_process);
+	check(task->t_process->p_sched != 0);
+	check(task->t_status == SCHED_STATUS_ACTIVE);
 
 	/*Decrease the couple of counters if possible and report if not;*/
 	if (!prim->p_nb_owning_tasks) {
@@ -341,12 +341,12 @@ void primitive_override_task(struct sprim *prim, struct stask *task) {
 	struct scheduler *sched;
 
 	/*Debug checks;*/
-	ns_check(task != 0)
-	ns_check(prim != 0)
-	ns_check(task->t_process != 0);
-	ns_check(prim->p_process == task->t_process);
-	ns_check(task->t_process->p_sched != 0);
-	ns_check(task->t_status == SCHED_STATUS_ACTIVE);
+	check(task != 0)
+	check(prim != 0)
+	check(task->t_process != 0);
+	check(prim->p_process == task->t_process);
+	check(task->t_process->p_sched != 0);
+	check(task->t_status == SCHED_STATUS_ACTIVE);
 
 	/*Fetch the scheduler of the primitive;*/
 	sched = prim->p_process->p_sched;
@@ -380,7 +380,7 @@ void primitive_override_task(struct sprim *prim, struct stask *task) {
 void primitive_unoverride_task(struct sprim *prim) {
 
 	/*Debug checks;*/
-	ns_check(prim != 0)
+	check(prim != 0)
 
 	/*Un-override if required;*/
 	_prim_un_override(prim);
@@ -402,18 +402,18 @@ void primitive_resume_task(struct stask *task) {
 	struct sprim *prim;
 
 	/*Check parameter;*/
-	ns_check(task != 0)
-	ns_check(task->t_process != 0)
+	check(task != 0)
+	check(task->t_process != 0)
 
 	/*Fetch the scheduler and the stopper primitive;*/
 	sched = task->t_process->p_sched;
 	prim = task->t_stopper;
 
 	/*Debug checks;*/
-	ns_check(sched != 0)
-	ns_check(prim != 0);
-	ns_check(prim->p_process == task->t_process);
-	ns_check(task->t_status == SCHED_STATUS_STOPPED)
+	check(sched != 0)
+	check(prim != 0);
+	check(prim->p_process == task->t_process);
+	check(task->t_status == SCHED_STATUS_STOPPED)
 
 	/*Insert the task in the active list;*/
 	dlist_insert_single_after(&sched->s_actives, &task->t_sched_list);
@@ -444,13 +444,13 @@ void primitive_stop_task(struct sprim *prim, struct stask *task) {
 	struct scheduler *sched;
 
 	/*Debug checks;*/
-	ns_check(task != 0)
-	ns_check(prim != 0)
-	ns_check(task->t_process != 0);
-	ns_check(prim->p_process == task->t_process);
-	ns_check(task->t_process->p_sched != 0);
-	ns_check(task_active(task) != 0);
-	ns_check(task->t_stopper == 0);
+	check(task != 0)
+	check(prim != 0)
+	check(task->t_process != 0);
+	check(prim->p_process == task->t_process);
+	check(task->t_process->p_sched != 0);
+	check(task_active(task) != 0);
+	check(task->t_stopper == 0);
 
 	/*Fetch the scheduler;*/
 	sched = task->t_process->p_sched;
@@ -492,11 +492,11 @@ void primitive_stop_thread(struct sprim *prim, struct sthread *thread) {
 	struct stask *task;
 
 	/*Check parameters;*/
-	ns_check(prim != 0);
-	ns_check(prim->p_process != 0);
-	ns_check(thread != 0);
-	ns_check(thread->t_sched != 0);
-	ns_check(prim->p_process->p_sched == thread->t_sched);
+	check(prim != 0);
+	check(prim->p_process != 0);
+	check(thread != 0);
+	check(thread->t_sched != 0);
+	check(prim->p_process->p_sched == thread->t_sched);
 
 	/*Fetch the scheduler and task;*/
 	sched = thread->t_sched;
@@ -526,14 +526,14 @@ void process_register_task(struct sprocess *prc, struct stask *task) {
 	struct scheduler *sched;
 
 	/*Parameters checks;*/
-	ns_check(prc)
-	ns_check(task)
+	check(prc)
+	check(task)
 
 	/*Fetch the scheduler;*/
 	sched = prc->p_sched;
 
 	/*Check the scheduler;*/
-	ns_check(sched != 0);
+	check(sched != 0);
 
 	/*Initialize the task;*/
 	task->t_status = SCHED_STATUS_ACTIVE;
@@ -574,18 +574,18 @@ err_t process_unregister_task(struct sthread *thread) {
 	struct sprim *overrider;
 
 	/*Check parameter;*/
-	ns_check(thread != 0);
+	check(thread != 0);
 
 	/*Fetch the scheduler and task;*/
 	sched = thread->t_sched;
 	task = thread->t_task;
 
 	/*Debug checks;*/
-	ns_check(sched != 0);
-	ns_check(thread_active(thread) != 0);
-	ns_check(task_active(task) != 0);
-	ns_check(task->t_process);
-	ns_check(task->t_process->p_sched == sched);
+	check(sched != 0);
+	check(thread_active(thread) != 0);
+	check(task_active(task) != 0);
+	check(task->t_process);
+	check(task->t_process->p_sched == sched);
 
 
 	/*If the task is stopped :*/
@@ -644,8 +644,8 @@ err_t process_unregister_task(struct sthread *thread) {
 void process_register_prim(struct sprocess *prc, struct sprim *prim) {
 
 	/*Check parameters;*/
-	ns_check(prc != 0);
-	ns_check(prim != 0);
+	check(prc != 0);
+	check(prim != 0);
 
 	/*Initialize the primitive;*/
 	prim->p_process = prc;
@@ -678,13 +678,13 @@ err_t process_unregister_prim(struct sprim *prim) {
 	struct stask *task;
 
 	/*Arg check;*/
-	ns_check(prim);
+	check(prim);
 
 	/*Fetch the process;*/
 	prc = prim->p_process;
 
 	/*Registration check;*/
-	ns_check(prc);
+	check(prc);
 
 	/*Fetch the head of the stopped tasks list;*/
 	head = &prim->p_stopped;
@@ -725,7 +725,7 @@ err_t process_unregister_prim(struct sprim *prim) {
 static __inline__ void abort_if_commit_closed(struct scheduler *sched) {
 
 	/*Check a commit is opened;*/
-	ns_check(sched->s_commit_opened != 0)
+	check(sched->s_commit_opened != 0)
 
 }
 
@@ -738,8 +738,8 @@ static __inline__ void abort_if_commit_closed(struct scheduler *sched) {
 void sched_register_thread(struct scheduler *sched, struct sthread *thread) {
 
 	/*Check parameters;*/
-	ns_check(sched != 0);
-	ns_check(thread != 0);
+	check(sched != 0);
+	check(thread != 0);
 
 	/*Initialize the thread;*/
 	thread->t_sched = sched;
@@ -762,8 +762,8 @@ void sched_register_thread(struct scheduler *sched, struct sthread *thread) {
 void sched_register_process(struct scheduler *sched, struct sprocess *prc) {
 
 	/*Check parameters;*/
-	ns_check(sched != 0);
-	ns_check(prc != 0);
+	check(sched != 0);
+	check(prc != 0);
 
 	/*Initialize the process;*/
 	prc->p_sched = sched;
@@ -796,13 +796,13 @@ void sched_unregister_thread(struct sthread *thread) {
 	struct dlist *save;
 
 	/*Check parameter;*/
-	ns_check(thread != 0)
+	check(thread != 0)
 
 	/*Fetch the scheduler;*/
 	sched = thread->t_sched;
 
 	/*Check the scheduler;*/
-	ns_check(sched != 0)
+	check(sched != 0)
 
 	/*Abort if no commit is opened;*/
 	abort_if_commit_closed(thread->t_sched);
@@ -844,13 +844,13 @@ void sched_unregister_process(struct sprocess *prc) {
 	struct stask *task;
 
 	/*Check arg;*/
-	ns_check(prc != 0);
+	check(prc != 0);
 
 	/*Fetch the scheduler;*/
 	sched = prc->p_sched;
 
 	/*Check the scheduler;*/
-	ns_check(sched != 0);
+	check(sched != 0);
 
 	/*Abort if no commit is opened;*/
 	abort_if_commit_closed(sched);
@@ -894,16 +894,16 @@ void sched_pause_process(struct sprocess *prc) {
 	struct stask *task;
 
 	/*Check arg;*/
-	ns_check(prc != 0);
+	check(prc != 0);
 
 	/*Fetch the scheduler;*/
 	sched = prc->p_sched;
 	
 	/*Check the scheduler;*/
-	ns_check(sched != 0);
+	check(sched != 0);
 
 	/*Check the process is active;*/
-	ns_check(prc->p_status == SCHED_STATUS_ACTIVE);
+	check(prc->p_status == SCHED_STATUS_ACTIVE);
 
 	/*Abort if no commit is opened;*/
 	abort_if_commit_closed(sched);
@@ -945,16 +945,16 @@ void sched_resume_process(struct sprocess *prc) {
 	struct stask *task;
 
 	/*Check arg;*/
-	ns_check(prc != 0);
+	check(prc != 0);
 	
 	/*Fetch the scheduler;*/
 	sched = prc->p_sched;
 	
 	/*Check the scheduler;*/
-	ns_check(sched != 0);
+	check(sched != 0);
 
 	/*Check the process is active;*/
-	ns_check(prc->p_status == SCHED_STATUS_STOPPED);
+	check(prc->p_status == SCHED_STATUS_STOPPED);
 
 	/*Abort if no commit is opened;*/
 	abort_if_commit_closed(sched);
@@ -1015,7 +1015,7 @@ void sched_unlock(struct scheduler *sched) {
 void sched_open_commit(struct scheduler *sched) {
 
 	/*Check that no commit is opened;*/
-	ns_check(sched->s_commit_opened == 0)
+	check(sched->s_commit_opened == 0)
 
 	/*Mark the commit opened;*/
 	sched->s_commit_opened = 1;
@@ -1034,7 +1034,7 @@ void sched_open_commit(struct scheduler *sched) {
 void sched_close_commit(struct scheduler *sched) {
 
 	/*Check that a commit is opened;*/
-	ns_check(sched->s_commit_opened != 0)
+	check(sched->s_commit_opened != 0)
 
 	/*Mark the commit opened;*/
 	sched->s_commit_opened = 0;
